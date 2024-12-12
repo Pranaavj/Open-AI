@@ -1,258 +1,197 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat Interface</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f7f7f7;
-            margin: 0;
-            padding: 0;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Data Display</title>
+<style>
+    body, html {
+        height: 100%;
+        margin: 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-family: Arial, sans-serif;
+    }
+    .container {
+        text-align: center;
+        max-width: 90%;
+    }
+    .form-group {
+        margin: 10px 0;
+    }
+    button {
+        margin: 10px;
+    }
+    .logo {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        width: 500px;
+        height: auto;
+    }
+    #data-table {
+        margin-top: 20px;
+        max-height: 60vh; /* Adjust the height as needed */
+        overflow-y: auto;
+        overflow-x: auto;
+    }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    th, td {
+        padding: 8px;
+        text-align: left;
+        border: 1px solid #ddd;
+    }
+    th {
+        background-color: #f2f2f2;
+    }
+    .dob-column {
+        width: 200px; /* Adjust this width as needed */
+    }
+</style>
+<script>
+async function fetchData() {
+    const numRows = document.getElementById('numRows').value;
+    if (!numRows || numRows <= 0) {
+        alert('Please enter a valid number of rows.');
+        return;
+    }
+
+    try {
+        const response = await fetch('/get_pranaav_data?numRows=' + numRows);
+        const data = await response.json();
+
+        let container = document.getElementById('data-table');
+        container.innerHTML = '';
+
+        if (data.length > 0) {
+            let table = '<table><thead><tr>';
+            // Specify the column order
+            const columns = [
+                'PAT_MRN_ID',
+                'PAT_FIRST_NAME',
+                'PAT_LAST_NAME',
+                'DOB',
+                'MOBILE_PHONE_NUMBER',
+                'PRC_NAME',
+                'DEPARTMENT_NAME',
+                'external_department_name',
+                'APPT_MADE_DATE',
+                'EFFECTIVE_DATE_DT'
+            ];
+            columns.forEach(col => {
+                table += `<th class="${col === 'DOB' ? 'dob-column' : ''}">${col}</th>`;
+            });
+            table += '</tr></thead><tbody>';
+            data.forEach(row => {
+                table += '<tr>';
+                columns.forEach(col => {
+                    table += `<td class="${col === 'DOB' ? 'dob-column' : ''}">${row[col] || ''}</td>`;
+                });
+                table += '</tr>';
+            });
+            table += '</tbody></table>';
+            container.innerHTML = table;
+            
+            document.getElementById('downloadCsv').disabled = false;
+            document.getElementById('downloadJson').disabled = false;
+            document.getElementById('downloadExcel').disabled = false;
+            document.getElementById('downloadXml').disabled = false;
+            document.getElementById('downloadCsv').onclick = () => downloadCSV(data, columns);
+            document.getElementById('downloadJson').onclick = () => downloadJSON(data);
+            document.getElementById('downloadExcel').onclick = () => downloadExcel(data, columns);
+            document.getElementById('downloadXml').onclick = () => downloadXML(data, columns);
+        } else {
+            container.innerHTML = '<p>No data found</p>';
         }
-        .logo {
-            width: 200px;
-            height: auto;
-            margin: 10px;
-        }
-        .container {
-            display: flex;
-            flex-direction: column;
-            background-color: white;
-            border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-            margin: 10px;
-            padding: 20px;
-            box-sizing: border-box;
-            text-align: center;
-            flex: 1;
-        }
-        .container h1 {
-            font-size: 24px;
-            margin-bottom: 10px;
-        }
-        .container h2 {
-            font-size: 20px;
-            margin-bottom: 20px;
-            margin-top: 20px;
-            display: block;
-            width: 100%;
-        }
-        .input-box {
-            width: calc(100% - 20px);
-            padding: 15px;
-            margin-bottom: 10px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            font-size: 16px;
-            box-sizing: border-box;
-        }
-        .button {
-            padding: 15px 20px;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-        .button:hover {
-            background-color: #0056b3;
-        }
-        .chat-container {
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            padding: 10px;
-            overflow-y: auto;
-            margin-bottom: 10px;
-            background-color: #f9f9f9;
-            text-align: left;
-            flex: 1;
-            max-height: 500px;
-        }
-        .message {
-            padding: 10px 15px;
-            border-radius: 5px;
-            margin-bottom: 10px;
-            font-size: 16px;
-            line-height: 1.4;
-            max-width: 80%;
-            position: relative;
-        }
-        .user-message {
-            background-color: #e1f5fe;
-            text-align: right;
-            margin-left: auto;
-        }
-        .assistant-message {
-            background-color: #f1f1f1;
-        }
-        .timestamp {
-            font-size: 12px;
-            color: #999;
-            margin-top: 5px;
-        }
-        .typing-indicator {
-            display: inline-block;
-            width: 0;
-            height: 0;
-            border-left: 8px solid transparent;
-            border-right: 8px solid transparent;
-            border-top: 8px solid #333;
-            border-radius: 50%;
-            animation: typing 1s infinite;
-        }
-        @keyframes typing {
-            0% { transform: translateY(0); opacity: 1; }
-            50% { transform: translateY(-8px); opacity: 0.5; }
-            100% { transform: translateY(0); opacity: 1; }
-        }
-        .heading {
-            font-size: 20px;
-            font-weight: bold;
-            margin-top: 10px;
-        }
-        .subheading {
-            font-size: 18px;
-            font-weight: bold;
-            margin-top: 10px;
-        }
-        .list {
-            padding-left: 20px;
-        }
-        .list-item {
-            margin-bottom: 5px;
-        }
-        .code {
-            background-color: #f4f4f4;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            padding: 10px;
-            font-family: monospace;
-            white-space: pre-wrap;
-            overflow-x: auto;
-        }
-        hr {
-            border: none;
-            border-top: 1px solid #ccc;
-            margin: 20px 0;
-        }
-    </style>
+    } catch (error) {
+        console.error('Error fetching data:', error);
+    }
+}
+
+function downloadCSV(data, headers) {
+    let csvContent = "data:text/csv;charset=utf-8,";
+    csvContent += headers.join(",") + "\n";
+    data.forEach(row => {
+        let rowContent = headers.map(header => row[header] || '').join(",");
+        csvContent += rowContent + "\n";
+    });
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "data.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+function downloadJSON(data) {
+    let jsonContent = "data:application/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data, null, 2));
+    const link = document.createElement("a");
+    link.setAttribute("href", jsonContent);
+    link.setAttribute("download", "data.json");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+function downloadExcel(data, headers) {
+    let csvContent = "data:text/csv;charset=utf-8,";
+    csvContent += headers.join(",") + "\n";
+    data.forEach(row => {
+        let rowContent = headers.map(header => row[header] || '').join(",");
+        csvContent += rowContent + "\n";
+    });
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "data.xlsx");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+function downloadXML(data, headers) {
+    let xmlContent = '<?xml version="1.0" encoding="UTF-8"?>\n<data>';
+    data.forEach(row => {
+        xmlContent += '\n  <row>';
+        headers.forEach(header => {
+            xmlContent += `\n    <${header.replace(/ /g, '_')}>${row[header] || ''}</${header.replace(/ /g, '_')}>`;
+        });
+        xmlContent += '\n  </row>';
+    });
+    xmlContent += '\n</data>';
+
+    const encodedUri = encodeURI("data:text/xml;charset=utf-8," + xmlContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "data.xml");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+</script>
 </head>
 <body>
-    <img src="https://mma.prnewswire.com/media/2066965/OSF_Innovation_Jump_10_year_logo_Logo.jpg?p=facebook" alt="OSF Logo" class="logo">
-    <div class="container">
-        <h1>OSF INNOVATION</h1>
-        <h2>Chat Interface</h2>
-        <div class="chat-container" id="chat-container">
-            <!-- Messages will be appended here -->
-        </div>
-        <input type="text" id="question-input" class="input-box" placeholder="Enter your question here...">
-        <button id="submit-button" class="button">Submit</button>
+<img src="https://www2.osfhealthcare.org/-/media/GIC/Logos/osf_logo_brown.png?h=968&iar=0&w=2832&rev=19318cf73c8f49f883bf0a1c8d19f299&hash=EB8E28B127BF497D9B89FF578703EB25" alt="OSF Healthcare Logo" class="logo">
+<div class="container">
+    <h1>Healthcare Synthetic Data Display</h1>
+    <div class="form-group">
+        <label for="numRows">Number of Rows:</label>
+        <input type="number" id="numRows" name="numRows" min="1" value="10">
     </div>
-
-    <script>
-        const questionInput = document.getElementById('question-input');
-        const submitButton = document.getElementById('submit-button');
-        const chatContainer = document.getElementById('chat-container');
-
-        let sessionId = localStorage.getItem('session_id');
-        if (!sessionId) {
-            sessionId = generateSessionId();
-            localStorage.setItem('session_id', sessionId);
-        }
-
-        function generateSessionId() {
-            return 'session_' + Math.random().toString(36).substr(2, 9);
-        }
-
-        function createMessageElement(content, className) {
-            const messageElement = document.createElement('div');
-            messageElement.classList.add('message', className);
-            messageElement.innerHTML = content;
-
-            const timestamp = document.createElement('div');
-            timestamp.classList.add('timestamp');
-            timestamp.textContent = new Date().toLocaleTimeString();
-
-            const messageContainer = document.createElement('div');
-            messageContainer.appendChild(messageElement);
-            messageContainer.appendChild(timestamp);
-
-            return messageContainer;
-        }
-
-        async function sendMessage() {
-            const userQuestion = questionInput.value.trim();
-            if (!userQuestion) return;
-
-            // Display user question
-            const userMessageElement = createMessageElement(userQuestion, 'user-message');
-            chatContainer.appendChild(userMessageElement);
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-
-            // Clear input
-            questionInput.value = '';
-
-            // Display typing indicator
-            const typingIndicator = document.createElement('div');
-            typingIndicator.classList.add('message', 'assistant-message');
-            typingIndicator.innerHTML = '<div class="typing-indicator"></div> Typing...';
-            chatContainer.appendChild(typingIndicator);
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-
-            // Send the question to the server
-            const response = await fetch('/ask', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ question: userQuestion, session_id: sessionId })
-            });
-            const data = await response.json();
-
-            // Remove typing indicator
-            chatContainer.removeChild(typingIndicator);
-
-            // Display assistant answer
-            const assistantMessageElement = createMessageElement(formatResponse(data.answer), 'assistant-message');
-            chatContainer.appendChild(assistantMessageElement);
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-        }
-
-        function formatResponse(response) {
-    // Escape HTML characters to prevent XSS attacks
-            response = response.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            
-
-    // Handle headings
-            response = response.replace(/^### (.+)$/gm, '<div class="subheading3">$1</div>');
-            response = response.replace(/^## (.+)$/gm, '<div class="subheading">$1</div>');
-            response = response.replace(/^# (.+)$/gm, '<div class="heading">$1</div>');
-            response = response.replace(/^#### (.+)$/gm, '<h4>$1</h4>');
-
-    // Handle list formatting (each item on a new line)
-            response = response.replace(/^([^\n]+)/gm, '<div class="list-item">$1</div>'); // Wrap each line in a div
-
-    // Handle code blocks
-            response = response.replace(/```([\s\S]*?)```/g, '<pre class="code">$1</pre>');
-
-    // Handle bold text
-            response = response.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-
-    // Handle italic text
-            response = response.replace(/\*(.*?)\*/g, '<em>$1</em>');
-
-            return response;
-        }
-
-
-
-        submitButton.addEventListener('click', sendMessage);
-    </script>
+    <button onclick="fetchData()">Generate Data</button>
+    <div id="data-table"></div>
+    <div class="form-group">
+        <button id="downloadCsv" disabled>Download CSV</button>
+        <button id="downloadJson" disabled>Download JSON</button>
+        <button id="downloadExcel" disabled>Download Excel</button>
+        <button id="downloadXml" disabled>Download XML</button>
+    </div>
+</div>
 </body>
 </html>
